@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased text-secondary-800 dark:text-secondary-200;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-600 text-white px-6 py-3 rounded-xl hover:bg-primary-700 
+           flex items-center gap-2 font-medium transition-all duration-200 
+           shadow-lg hover:shadow-primary-500/25 hover:-translate-y-0.5;
+  }
+
+  .input-field {
+    @apply w-full p-3 rounded-xl border-2 border-secondary-200 
+           focus:border-primary-500 focus:outline-none focus:ring-2 
+           focus:ring-primary-200 dark:border-secondary-700 dark:bg-secondary-800 
+           dark:text-white transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-white dark:bg-secondary-800 rounded-2xl shadow-lg 
+           hover:shadow-xl transition-all duration-300 overflow-hidden;
+  }
+
+  .glass-card {
+    @apply bg-white/90 dark:bg-secondary-800/90 backdrop-blur-sm 
+           rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-secondary-100 dark:bg-secondary-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-secondary-300 dark:bg-secondary-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-secondary-400 dark:bg-secondary-500;
+}
+
+/* Smooth transitions for dark mode */
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
