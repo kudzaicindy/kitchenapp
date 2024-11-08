@@ -8,6 +8,7 @@ import SearchBar from './SearchBar';
 import LogoutButton from './LogoutButton';
 import { FaArrowLeft, FaSignOutAlt, FaBars } from 'react-icons/fa';
 import { KitchenContext, useKitchenStore, ItemCard } from './Inventory';
+import ItemModal from './ItemModal';
 
 const ManageItems = () => {
   const navigate = useNavigate();
@@ -174,11 +175,13 @@ const ManageItems = () => {
           backgroundRepeat: 'no-repeat'
         }}
       >
+        <div className="absolute inset-0 bg-black/50" />
+        
         <div className={`absolute inset-0 ${
           state.theme === 'light' 
-            ? 'bg-white/80' 
-            : 'bg-secondary-900/90'
-        } backdrop-blur-[1px] transition-colors duration-300`} />
+            ? 'bg-gray-100/70'
+            : 'bg-secondary-900/80'
+        } backdrop-blur-[3px] transition-colors duration-300`} />
 
         <div className="relative z-10 p-2 sm:p-4 md:p-8">
           <div className="max-w-7xl mx-auto">
@@ -249,27 +252,21 @@ const ManageItems = () => {
             </div>
 
             <div className="space-y-3 sm:space-y-4 md:space-y-6">
-              {showForm && (
-                <div className="bg-white/90 dark:bg-gray-800/90 rounded-lg sm:rounded-xl shadow-md sm:shadow-lg p-3 sm:p-4 md:p-6 backdrop-blur-sm mx-2 sm:mx-0">
-                  <ItemForm
-                    onSubmit={handleAddItem}
-                    onCancel={() => setShowForm(false)}
-                    availableLocations={locations}
-                  />
-                </div>
-              )}
+              <ItemModal
+                isOpen={showForm}
+                onClose={() => setShowForm(false)}
+                onSubmit={handleAddItem}
+                availableLocations={locations}
+              />
 
-              {editingItem && (
-                <div className="bg-white/90 dark:bg-gray-800/90 rounded-lg sm:rounded-xl shadow-md sm:shadow-lg p-3 sm:p-4 md:p-6 backdrop-blur-sm mx-2 sm:mx-0">
-                  <ItemForm
-                    item={editingItem}
-                    onSubmit={handleUpdateItem}
-                    onCancel={() => setEditingItem(null)}
-                    isEditing={true}
-                    availableLocations={locations}
-                  />
-                </div>
-              )}
+              <ItemModal
+                isOpen={!!editingItem}
+                onClose={() => setEditingItem(null)}
+                onSubmit={handleUpdateItem}
+                item={editingItem}
+                isEditing={true}
+                availableLocations={locations}
+              />
 
               {items.length === 0 ? (
                 <div className="bg-white/90 dark:bg-gray-800/90 rounded-lg sm:rounded-xl shadow-md sm:shadow-lg p-4 sm:p-6 md:p-8 backdrop-blur-sm text-center mx-2 sm:mx-0">
