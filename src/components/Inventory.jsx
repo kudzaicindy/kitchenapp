@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect, useState } from 'react';
 import { Plus, Trash2, Edit2, Search, Layout, Grid, List, Moon, Sun, Image, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import Locations from './Locations';
@@ -9,6 +9,8 @@ import IngredientsModal from './IngredientsModal';
 import StorageModal from './StorageModal';
 import AppliancesModal from './AppliancesModal';
 import LogoutButton from './LogoutButton';
+import { supabase } from '../supabaseClient';
+import { FaArrowLeft, FaArrowRight, FaSignOutAlt, FaBars } from 'react-icons/fa';
 
 // Context
 const KitchenContext = createContext(null);
@@ -19,17 +21,18 @@ const ACTIONS = {
   UPDATE_ITEM: 'UPDATE_ITEM',
   DELETE_ITEM: 'DELETE_ITEM',
   SET_THEME: 'SET_THEME',
-  SET_VIEW: 'SET_VIEW'
+  SET_VIEW: 'SET_VIEW',
+  SET_ITEMS: 'SET_ITEMS'
 };
 
 // Image categories mapping
 const categoryImages = {
-  'Dinnerware': 'https://images.unsplash.com/photo-1603199506016-b9a594b593c0?auto=format&fit=crop&q=80',
-  'Cookware': 'https://images.unsplash.com/photo-1584990347449-a8f1d78a1c3f?auto=format&fit=crop&q=80',
-  'Utensils': 'https://images.unsplash.com/photo-1593618998160-e34014e67546?auto=format&fit=crop&q=80',
-  'Appliances': 'https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?auto=format&fit=crop&q=80',
-  'Ingredients': 'https://images.unsplash.com/photo-1620706857370-e1b9770e8bb1?auto=format&fit=crop&q=80',
-  'Storage': 'https://images.unsplash.com/photo-1520981825232-ece5fae45120?auto=format&fit=crop&q=80'
+  'Dinnerware': '/dinner2.jpg',
+  'Cookware': '/set4.jpg',
+  'Utensils': '/utensils1.jpg',
+  'Appliances': '/blender.jpg',
+  'Ingredients': '/sugar.jpg',
+  'Storage': '/potatoes.jpg'
 };
 
 // Reducer
@@ -62,6 +65,11 @@ const kitchenReducer = (state, action) => {
         ...state,
         viewMode: action.payload
       };
+    case ACTIONS.SET_ITEMS:
+      return {
+        ...state,
+        items: action.payload
+      };
     default:
       return state;
   }
@@ -78,7 +86,7 @@ const useKitchenStore = () => {
         quantity: 5, 
         location: 'Lower Cabinet', 
         description: 'Professional grade stainless steel cookware set',
-        image: '/professional pots.jpg'
+        image: '/set4.jpg'
       },
       { 
         id: 2, 
@@ -113,8 +121,8 @@ const useKitchenStore = () => {
         category: 'Storage',
         quantity: 6,
         location: 'Pantry',
-        description: 'Essential food storage items including rice, flour, potatoes, pasta, oil, and bread',
-        image: '/rice.jpg'
+        description: 'Essential food storage items',
+        image: '/potatoes.jpg'
       },
       { 
         id: 6, 
@@ -122,7 +130,7 @@ const useKitchenStore = () => {
         category: 'Appliances',
         quantity: 8,
         location: 'Countertop',
-        description: 'Essential kitchen appliances including mixer, food processor, blender, and more',
+        description: 'Essential kitchen appliances',
         image: '/blender.jpg'
       }
     ],
@@ -169,7 +177,7 @@ const SearchBar = ({ searchTerm, setSearchTerm }) => (
   </div>
 );
 
-const ItemCard = ({ item, onEdit, onDelete }) => {
+const ItemCard = ({ item, onEdit, onDelete, viewMode }) => {
   const { theme } = useKitchenContext();
   const [showDinnerModal, setShowDinnerModal] = React.useState(false);
   const [showPotsModal, setShowPotsModal] = React.useState(false);
@@ -308,6 +316,7 @@ const Inventory = () => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [activeTab, setActiveTab] = React.useState('items');
   const navigate = useNavigate();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleDeleteItem = useCallback((id) => {
     dispatch({ type: ACTIONS.DELETE_ITEM, payload: id });
@@ -338,6 +347,42 @@ const Inventory = () => {
     }
   }, [activeTab, navigate]);
 
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('items')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        
+        // Update the state with database items
+        dispatch({ type: ACTIONS.SET_ITEMS, payload: data || [] });
+      } catch (error) {
+        console.error('Error fetching items:', error);
+      }
+    };
+
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel('items_channel')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'items' },
+        (payload) => {
+          console.log('Change received in Inventory!', payload);
+          fetchItems(); // Refresh items when changes occur
+      })
+      .subscribe();
+
+    fetchItems();
+
+    // Cleanup subscription
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [dispatch]);
+
   return (
     <KitchenContext.Provider value={state}>
       <div 
@@ -356,49 +401,113 @@ const Inventory = () => {
             : 'bg-secondary-900/90'
         } backdrop-blur-[1px] transition-colors duration-300`} />
 
-        <div className="relative z-10 p-4 md:p-8">
+        <div className="relative z-10 p-2 sm:p-4 md:p-8">
           <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-12">
-              <div className="flex items-center gap-4">
+            {/* Header Section */}
+            <div className="flex justify-between items-center gap-3 sm:gap-6 mb-4 sm:mb-8 md:mb-12 px-2 sm:px-0">
+              {/* Left side with back arrow and title */}
+              <div className="flex items-center gap-2 sm:gap-4">
                 <Link 
                   to="/organization"
-                  className="p-2 rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-md sm:shadow-lg hover:shadow-xl transition-all duration-200"
                 >
-                  <ArrowLeft size={24} />
+                  <FaArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
                 </Link>
-                <h1 className="text-4xl md:text-5xl font-bold dark:text-white">Kitchen Inventory</h1>
+                <h1 className="text-xl sm:text-3xl md:text-4xl lg:text-5xl font-bold dark:text-white">Kitchen Inventory</h1>
               </div>
-              <div className="flex items-center gap-4">
-                <LogoutButton />
-                <Link 
-                  to="/manage"
-                  className="p-2 rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
-                >
-                  <ArrowRight size={24} />
-                </Link>
+
+              {/* Right side with icons */}
+              <div className="flex items-center">
+                {/* Mobile hamburger menu */}
                 <button
-                  onClick={toggleView}
-                  className="p-3 rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
+                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                  className="sm:hidden p-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-md hover:shadow-xl transition-all duration-200"
                 >
-                  {state.viewMode === 'grid' ? <List size={22} /> : <Grid size={22} />}
+                  <FaBars className="w-5 h-5" />
                 </button>
-                <button
-                  onClick={toggleTheme}
-                  className="p-3 rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
-                >
-                  {state.theme === 'light' ? <Moon size={22} /> : <Sun size={22} />}
-                </button>
+
+                {/* Desktop icons */}
+                <div className="hidden sm:flex items-center gap-2 sm:gap-4">
+                  <button
+                    onClick={toggleView}
+                    className="p-1.5 sm:p-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-md hover:shadow-xl transition-all duration-200"
+                  >
+                    {state.viewMode === 'grid' ? 
+                      <List className="w-4 h-4 sm:w-5 sm:h-5" /> : 
+                      <Grid className="w-4 h-4 sm:w-5 sm:h-5" />
+                    }
+                  </button>
+                  <button
+                    onClick={toggleTheme}
+                    className="p-1.5 sm:p-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-md hover:shadow-xl transition-all duration-200"
+                  >
+                    {state.theme === 'light' ? 
+                      <Moon className="w-4 h-4 sm:w-5 sm:h-5" /> : 
+                      <Sun className="w-4 h-4 sm:w-5 sm:h-5" />
+                    }
+                  </button>
+                  <Link 
+                    to="/manage"
+                    className="p-1.5 sm:p-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-md hover:shadow-xl transition-all duration-200"
+                  >
+                    <FaArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </Link>
+                  <button
+                    onClick={() => supabase.auth.signOut()}
+                    className="p-1.5 sm:p-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-md hover:shadow-xl transition-all duration-200"
+                  >
+                    <FaSignOutAlt className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                </div>
               </div>
+
+              {/* Mobile menu dropdown */}
+              {isMobileMenuOpen && (
+                <div className="absolute top-2 right-2 z-50 sm:hidden">
+                  <div className="bg-white/90 dark:bg-gray-800/90 rounded-lg shadow-lg backdrop-blur-sm p-2 space-y-1">
+                    <button
+                      onClick={toggleView}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg w-full"
+                    >
+                      {state.viewMode === 'grid' ? <List className="w-4 h-4" /> : <Grid className="w-4 h-4" />}
+                      {state.viewMode === 'grid' ? 'List View' : 'Grid View'}
+                    </button>
+                    <button
+                      onClick={toggleTheme}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg w-full"
+                    >
+                      {state.theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                      {state.theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                    </button>
+                    <Link 
+                      to="/manage"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg w-full"
+                    >
+                      <FaArrowRight className="w-4 h-4" />
+                      Manage
+                    </Link>
+                    <button
+                      onClick={() => supabase.auth.signOut()}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg w-full"
+                    >
+                      <FaSignOutAlt className="w-4 h-4" />
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="mb-12">
+            {/* Search Bar */}
+            <div className="mb-4 sm:mb-6 md:mb-8 px-2 sm:px-0">
               <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
             </div>
 
-            <div className="flex gap-4 mb-8">
+            {/* Tabs */}
+            <div className="flex gap-2 sm:gap-4 mb-4 sm:mb-6 md:mb-8 px-2 sm:px-0">
               <button
                 onClick={() => setActiveTab('items')}
-                className={`px-4 py-2 rounded-lg transition-colors ${
+                className={`px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base transition-colors ${
                   activeTab === 'items'
                     ? 'bg-primary-600 text-white'
                     : 'bg-white/80 dark:bg-gray-800/80'
@@ -408,7 +517,7 @@ const Inventory = () => {
               </button>
               <button
                 onClick={() => setActiveTab('locations')}
-                className={`px-4 py-2 rounded-lg transition-colors ${
+                className={`px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base transition-colors ${
                   activeTab === 'locations'
                     ? 'bg-primary-600 text-white'
                     : 'bg-white/80 dark:bg-gray-800/80'
@@ -419,33 +528,23 @@ const Inventory = () => {
             </div>
 
             {activeTab === 'items' ? (
-              <div className="space-y-8">
-                {/* First row - first 3 items */}
-                <div className="grid grid-cols-3 gap-8">
-                  {filteredItems.slice(0, 3).map(item => (
+              <div className="space-y-3 sm:space-y-4 md:space-y-6">
+                <div className="grid grid-cols-2 xs:grid-cols-3 gap-1.5 xs:gap-2 sm:gap-3 md:gap-4 lg:gap-6 px-1 xs:px-2 sm:px-0">
+                  {filteredItems.map(item => (
                     <ItemCard
                       key={item.id}
                       item={item}
                       onEdit={handleEditItem}
                       onDelete={handleDeleteItem}
-                    />
-                  ))}
-                </div>
-                
-                {/* Second row - next 3 items */}
-                <div className="grid grid-cols-3 gap-8">
-                  {filteredItems.slice(3, 6).map(item => (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      onEdit={handleEditItem}
-                      onDelete={handleDeleteItem}
+                      viewMode={state.viewMode}
                     />
                   ))}
                 </div>
               </div>
             ) : (
-              <Locations items={state.items} />
+              <div className="px-2 sm:px-0">
+                <Locations items={state.items} />
+              </div>
             )}
           </div>
         </div>
